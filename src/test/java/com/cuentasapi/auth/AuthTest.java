@@ -134,4 +134,18 @@ class AuthTest extends IntegrationTest {
                 .isEqualTo("OPERADOR");
         assertThat(jdbc.queryForObject("select count(*) from users", Integer.class)).isEqualTo(1);
     }
+
+    @Test
+    void error_path_is_public_so_a_server_error_is_not_reported_as_401() {
+        ResponseEntity<Map> response = call(HttpMethod.GET, "/error", null, null, Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @Test
+    void password_longer_than_72_bytes_is_400_even_if_it_is_under_72_characters() {
+        // 40 characters, 80 bytes in UTF-8: BCrypt cannot hash it.
+        assertThat(register("f@x.com", "é".repeat(40)).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(jdbc.queryForObject("select count(*) from users", Integer.class)).isZero();
+    }
 }

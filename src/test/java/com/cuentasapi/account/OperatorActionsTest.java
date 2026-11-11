@@ -89,4 +89,19 @@ class OperatorActionsTest extends IntegrationTest {
     void deposit_to_nonexistent_account_is_404() {
         assertThat(deposit(operatorToken(), 999999, 100).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
+
+    @Test
+    void deposit_with_a_string_or_missing_amount_is_400() {
+        long account = open(clientToken("ana@x.com"));
+        String operator = operatorToken();
+
+        assertThat(deposit(operator, account, "100").getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(call(HttpMethod.POST, "/api/v1/accounts/" + account + "/deposits", operator, Map.of(), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(balance(account)).isZero();
+    }
+
+    private long balance(long account) {
+        return jdbc.queryForObject("select balance from accounts where id = ?", Long.class, account);
+    }
 }

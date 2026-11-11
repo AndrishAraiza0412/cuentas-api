@@ -6,7 +6,7 @@ A bank-style REST API in Java 23 and Spring Boot 3.5. Customers open accounts an
 - Amounts are whole centavos (MXN), stored as `bigint`. There is no floating point anywhere near money.
 - Every transfer is one database transaction that writes the transfer, a debit and a credit entry, and both new balances.
 - Retrying a transfer with the same `Idempotency-Key` returns the original response and moves the money once.
-- Errors are `application/problem+json`. API docs are generated with OpenAPI (Swagger UI at `/swagger-ui/index.html`).
+- Errors the API produces itself (validation, not found, conflict, auth) are `application/problem+json`; an unhandled server error falls back to Spring Boot's default JSON. API docs are generated with OpenAPI (Swagger UI at `/swagger-ui/index.html`).
 
 ## Decisions and why
 
@@ -24,23 +24,24 @@ A bank-style REST API in Java 23 and Spring Boot 3.5. Customers open accounts an
 
 ## What the tests prove
 
-53 tests, all against a real PostgreSQL started by Testcontainers (no H2).
+58 tests, all against a real PostgreSQL started by Testcontainers (no H2).
 
 | Guarantee | Tests |
 |---|---|
 | Schema rejects negative balances and duplicate idempotency keys | `SchemaTest` (2) |
-| Registration, login, role checks; expired, tampered and missing tokens are 401; the same email in a different letter case is a 409 | `AuthTest` (9) |
-| Audit entries for register, login (including failed) and transfers; filtering; page size capped at 100 | `AuditTest` (5) |
+| Registration, login, role checks; expired, tampered and missing tokens are 401; the same email in a different letter case is a 409; a password over 72 bytes is a 400; `/error` is public so a server error is not reported as 401 | `AuthTest` (11) |
+| 20 simultaneous failed logins (more than the 10-connection pool) are all 401 and all audited | `LoginConcurrencyTest` (1) |
+| Audit entries for register and login (including failed); filtering; page size capped at 100. Transfer audit rows (including failed ones) are asserted in `TransferTest` | `AuditTest` (5) |
 | Ownership (404 for other people's accounts), paging, amount rules | `AccountTest` (7), `MoneyTest` (2) |
-| Deposits, freezing, non-integer and out-of-range amounts rejected | `OperatorActionsTest` (7) |
-| Transfers: correct balances and entries, insufficient funds, same account, missing or frozen accounts, nothing changes on failure | `TransferTest` (10) |
+| Deposits, freezing, non-integer, string, missing and out-of-range amounts rejected | `OperatorActionsTest` (8) |
+| Transfers: correct balances and entries, insufficient funds, same account, missing or frozen accounts, nothing changes on failure; missing fields and string amounts are 400 | `TransferTest` (11) |
 | Idempotency: same key and body replays, different body is 422, keys are per user, a failed attempt can be retried | `IdempotencyTest` (6) |
 | 50 simultaneous transfers from one account: exactly 33 succeed, 17 get 422, final balance exact | `ConcurrencyTest` (3) |
 | 40 crossed transfers (A to B and B to A) finish with no deadlock | `ConcurrencyTest` |
 | 20 parallel requests with one idempotency key apply it once | `ConcurrencyTest` |
 | OpenAPI document lists the endpoints and the bearer scheme; health endpoint is up | `OpenApiTest` (2) |
 
-After every concurrency test an invariant is checked ([`Invariants.java`](src/test/java/com/cuentasapi/common/Invariants.java)): each balance equals the sum of its ledger entries, none is negative, and the total money equals what operators deposited. To check that these tests can fail, the row lock was removed once and two of the three concurrency tests failed (the third is protected by the unique key instead). The suite was run four times in a row with no flaky result.
+After every concurrency test an invariant is checked ([`Invariants.java`](src/test/java/com/cuentasapi/common/Invariants.java)): each balance equals the sum of its ledger entries, none is negative, and the total money equals what operators deposited. To check that these tests can fail, the row lock was removed once and two of the three concurrency tests failed (the third is protected by the unique key instead). The suite was run four times in a row with no flaky result before the review fixes.
 
 ## Run it
 
@@ -55,14 +56,15 @@ curl localhost:8080/actuator/health
 Open `http://localhost:8080/swagger-ui/index.html`, or use [`requests.http`](requests.http) (VS Code REST Client). The full flow in that file (register, log in, open accounts, deposit, transfer, repeat the transfer, read history and audit) was also run against the Docker stack with `curl`; the repeated transfer returned the same body and moved the money once.
 
 ```bash
-mvn verify                    # 53 tests; needs Docker running for Testcontainers
+mvn verify                    # 58 tests; needs Docker running for Testcontainers
 ```
 
 ## Known limits
 
 - One currency, no fees, no scheduled transfers, no refresh tokens, no email, no front end.
-- Java 23 is not an LTS release. It is what is installed on the development machine, and local runs, Docker and CI all use it so they match. Moving to Java 25 (LTS) later is a version bump.
+- Java 23 is not an LTS release. It is what is installed on the development machine, and local runs, Docker and CI all use it so they match. Java 23 no longer receives security updates, so before any real use move to Java 25 (LTS), which is a version bump.
 - The operator is created from `OPERATOR_EMAIL` and `OPERATOR_PASSWORD`; changing the password means changing the user in the database.
+- Deposits are not idempotent: an operator who retries a deposit credits it twice.
 - A transfer that fails is not stored for idempotency: repeating it re-evaluates it. Only successful transfers replay.
 - Local only. It has not been deployed, and the GitHub Actions workflow ([`ci.yml`](.github/workflows/ci.yml)) has not run yet, so CI is unverified until the first push.
 

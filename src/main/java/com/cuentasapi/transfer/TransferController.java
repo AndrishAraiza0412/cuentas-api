@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import com.cuentasapi.auth.CurrentUser;
 import com.cuentasapi.transfer.TransferService.TransferRequest;
 import com.cuentasapi.transfer.TransferService.TransferResponse;
+import jakarta.validation.Valid;
 import com.cuentasapi.common.ApiException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -35,7 +36,7 @@ public class TransferController {
             responses = @ApiResponse(responseCode = "201", content = @Content(mediaType = "application/json",
                     schema = @Schema(implementation = TransferResponse.class))))
     public ResponseEntity<String> create(@RequestHeader("Idempotency-Key") String key,
-                                         @RequestBody TransferRequest request) {
+                                         @Valid @RequestBody TransferRequest request) {
         if (key.isBlank() || key.length() > 80 || !key.matches("\\p{Print}+")) {
             throw ApiException.badRequest("Idempotency-Key must be 1 to 80 printable characters");
         }

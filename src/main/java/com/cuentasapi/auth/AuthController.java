@@ -1,10 +1,13 @@
 package com.cuentasapi.auth;
 
 import io.swagger.v3.oas.annotations.Operation;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.nio.charset.StandardCharsets;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,6 +20,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     public record RegisterRequest(@NotBlank @Email String email, @NotBlank @Size(min = 8, max = 72) String password) {
+
+        /** BCrypt hashes at most 72 bytes; 72 multibyte characters can be more than that. */
+        @JsonIgnore
+        @AssertTrue(message = "password must be at most 72 bytes in UTF-8")
+        public boolean isPasswordWithinBcryptLimit() {
+            return password == null || password.getBytes(StandardCharsets.UTF_8).length <= 72;
+        }
     }
 
     public record LoginRequest(@NotBlank String email, @NotBlank String password) {

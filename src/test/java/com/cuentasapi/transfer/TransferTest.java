@@ -106,4 +106,20 @@ class TransferTest extends TransferSupport {
         assertThat(call(HttpMethod.GET, "/api/v1/transfers/" + id, operator, null, Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(call(HttpMethod.GET, "/api/v1/transfers/" + id, ben, null, Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
+
+    @Test
+    void missing_fields_or_a_string_amount_are_400_not_zero_or_coerced() {
+        ResponseEntity<Map> noTarget = call(HttpMethod.POST, "/api/v1/transfers", ana,
+                Map.of("sourceAccountId", anaAccount, "amount", 100), Map.class, Map.of("Idempotency-Key", "m-1"));
+        ResponseEntity<Map> noAmount = call(HttpMethod.POST, "/api/v1/transfers", ana,
+                Map.of("sourceAccountId", anaAccount, "targetAccountId", benAccount), Map.class, Map.of("Idempotency-Key", "m-2"));
+        ResponseEntity<Map> stringAmount = call(HttpMethod.POST, "/api/v1/transfers", ana,
+                Map.of("sourceAccountId", anaAccount, "targetAccountId", benAccount, "amount", "100"), Map.class,
+                Map.of("Idempotency-Key", "m-3"));
+
+        assertThat(noTarget.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(noAmount.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(stringAmount.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(balance(anaAccount)).isEqualTo(10_000);
+    }
 }

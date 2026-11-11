@@ -62,7 +62,7 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/api/v1/auth/**", "/v3/api-docs/**", "/swagger-ui/**",
-                                "/swagger-ui.html", "/actuator/health").permitAll()
+                                "/swagger-ui.html", "/actuator/health", "/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/audit").hasRole("OPERADOR")
                         .requestMatchers(HttpMethod.POST, "/api/v1/accounts/*/deposits",
                                 "/api/v1/accounts/*/freeze", "/api/v1/accounts/*/unfreeze").hasRole("OPERADOR")

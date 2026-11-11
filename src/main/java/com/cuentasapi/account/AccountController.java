@@ -5,6 +5,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import com.cuentasapi.auth.CurrentUser;
 import com.cuentasapi.common.PageResponse;
 import com.cuentasapi.common.PageSizes;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -36,7 +38,7 @@ public class AccountController {
         }
     }
 
-    public record DepositRequest(long amount) {
+    public record DepositRequest(@NotNull Long amount) {
     }
 
     private final AccountService accounts;
@@ -77,7 +79,7 @@ public class AccountController {
 
     @PostMapping("/{id}/deposits")
     @Operation(summary = "Credit an account (OPERADOR)")
-    public AccountResponse deposit(@PathVariable long id, @RequestBody DepositRequest request) {
+    public AccountResponse deposit(@PathVariable long id, @Valid @RequestBody DepositRequest request) {
         return AccountResponse.of(accounts.deposit(id, request.amount(), CurrentUser.id()));
     }
 

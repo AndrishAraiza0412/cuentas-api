@@ -48,7 +48,10 @@ public class AuthService {
         }
     }
 
-    @Transactional
+    /**
+     * No outer transaction on purpose: a failed login is audited in its own transaction, and holding one connection
+     * while asking the pool for a second would deadlock the pool under concurrent failures.
+     */
     public String login(String email, String password) {
         String normalized = normalize(email);
         User user = users.findByEmail(normalized)

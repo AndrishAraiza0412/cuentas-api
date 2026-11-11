@@ -10,6 +10,7 @@ import com.cuentasapi.common.ApiException;
 import com.cuentasapi.common.Money;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.validation.constraints.NotNull;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -28,7 +29,7 @@ public class TransferService {
     public record StoredResponse(int status, String body) {
     }
 
-    public record TransferRequest(long sourceAccountId, long targetAccountId, long amount) {
+    public record TransferRequest(@NotNull Long sourceAccountId, @NotNull Long targetAccountId, @NotNull Long amount) {
     }
 
     public record TransferResponse(long id, long sourceAccountId, long targetAccountId, long amount, String status,

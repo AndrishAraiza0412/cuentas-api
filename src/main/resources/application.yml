@@ -1,5 +1,8 @@
 spring:
   jackson:
+    mapper:
+      # A JSON string such as "100" is not an amount: reject it instead of coercing it.
+      allow-coercion-of-scalars: false
     deserialization:
       # Amounts are whole centavos: 1.5 must be a 400, not silently truncated to 1.
       accept-float-as-int: false
