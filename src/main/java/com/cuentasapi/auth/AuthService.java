@@ -1,5 +1,6 @@
 package com.cuentasapi.auth;
 
+import com.cuentasapi.audit.AuditService;
 import com.cuentasapi.common.ApiException;
 import java.util.Locale;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -13,11 +14,13 @@ public class AuthService {
     private final UserRepository users;
     private final PasswordEncoder encoder;
     private final JwtService jwt;
+    private final AuditService audit;
 
-    public AuthService(UserRepository users, PasswordEncoder encoder, JwtService jwt) {
+    public AuthService(UserRepository users, PasswordEncoder encoder, JwtService jwt, AuditService audit) {
         this.users = users;
         this.encoder = encoder;
         this.jwt = jwt;
+        this.audit = audit;
     }
 
     private static String normalize(String email) {
@@ -26,7 +29,9 @@ public class AuthService {
 
     @Transactional
     public User register(String email, String password) {
-        return create(email, password, Role.CLIENTE);
+        User user = create(email, password, Role.CLIENTE);
+        audit.record(user.getId(), "REGISTER", "user:" + user.getId(), "OK");
+        return user;
     }
 
     /** Creates a user with the given role; a duplicate email (any letter case) is a 409. */
@@ -43,11 +48,17 @@ public class AuthService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public String login(String email, String password) {
-        User user = users.findByEmail(normalize(email))
+        String normalized = normalize(email);
+        User user = users.findByEmail(normalized)
                 .filter(u -> encoder.matches(password, u.getPasswordHash()))
-                .orElseThrow(() -> ApiException.unauthorized("Invalid email or password"));
+                .orElse(null);
+        if (user == null) {
+            audit.recordIndependent(null, "LOGIN", normalized, "FAILED");
+            throw ApiException.unauthorized("Invalid email or password");
+        }
+        audit.record(user.getId(), "LOGIN", "user:" + user.getId(), "OK");
         return jwt.issue(user);
     }
 }
