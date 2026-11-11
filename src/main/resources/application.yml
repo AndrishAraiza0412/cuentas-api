@@ -12,6 +12,12 @@ spring:
     hibernate:
       ddl-auto: validate
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
 app:
   jwt:
     # HS256 key: at least 32 bytes. Override with JWT_SECRET outside local development.

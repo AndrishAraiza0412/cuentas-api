@@ -1,5 +1,7 @@
 package com.cuentasapi.account;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import com.cuentasapi.auth.CurrentUser;
 import com.cuentasapi.common.PageResponse;
 import com.cuentasapi.common.PageSizes;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@SecurityRequirement(name = "bearerAuth")
 @RequestMapping("/api/v1/accounts")
 public class AccountController {
 
@@ -44,11 +47,13 @@ public class AccountController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Open an account for the caller (CLIENTE)")
     public AccountResponse open() {
         return AccountResponse.of(accounts.open(CurrentUser.id()));
     }
 
     @GetMapping
+    @Operation(summary = "List accounts (own for CLIENTE, all for OPERADOR)")
     public PageResponse<AccountResponse> list(@RequestParam(defaultValue = "0") int page,
                                               @RequestParam(defaultValue = "" + PageSizes.DEFAULT) int size) {
         PageRequest request = PageRequest.of(Math.max(page, 0), PageSizes.cap(size), Sort.by("id"));
@@ -56,11 +61,13 @@ public class AccountController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Read one account")
     public AccountResponse get(@PathVariable long id) {
         return AccountResponse.of(accounts.get(id, CurrentUser.id(), CurrentUser.isOperator()));
     }
 
     @GetMapping("/{id}/entries")
+    @Operation(summary = "Ledger history, newest first (page size capped at 100)")
     public PageResponse<EntryResponse> entries(@PathVariable long id,
                                                @RequestParam(defaultValue = "0") int page,
                                                @RequestParam(defaultValue = "" + PageSizes.DEFAULT) int size) {
@@ -69,16 +76,19 @@ public class AccountController {
     }
 
     @PostMapping("/{id}/deposits")
+    @Operation(summary = "Credit an account (OPERADOR)")
     public AccountResponse deposit(@PathVariable long id, @RequestBody DepositRequest request) {
         return AccountResponse.of(accounts.deposit(id, request.amount(), CurrentUser.id()));
     }
 
     @PostMapping("/{id}/freeze")
+    @Operation(summary = "Freeze an account (OPERADOR)")
     public AccountResponse freeze(@PathVariable long id) {
         return AccountResponse.of(accounts.setFrozen(id, true, CurrentUser.id()));
     }
 
     @PostMapping("/{id}/unfreeze")
+    @Operation(summary = "Unfreeze an account (OPERADOR)")
     public AccountResponse unfreeze(@PathVariable long id) {
         return AccountResponse.of(accounts.setFrozen(id, false, CurrentUser.id()));
     }

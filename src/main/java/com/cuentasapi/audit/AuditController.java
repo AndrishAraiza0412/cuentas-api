@@ -1,5 +1,7 @@
 package com.cuentasapi.audit;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import com.cuentasapi.common.PageResponse;
 import com.cuentasapi.common.PageSizes;
 import java.time.Instant;
@@ -9,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@SecurityRequirement(name = "bearerAuth")
 @RequestMapping("/api/v1/audit")
 public class AuditController {
 
@@ -22,6 +25,7 @@ public class AuditController {
     }
 
     @GetMapping
+    @Operation(summary = "Read the audit log, newest first (OPERADOR)")
     public PageResponse<AuditResponse> list(@RequestParam(required = false) Long actor,
                                             @RequestParam(required = false) String action,
                                             @RequestParam(defaultValue = "0") int page,

@@ -1,5 +1,6 @@
 package com.cuentasapi.auth;
 
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -35,12 +36,14 @@ public class AuthController {
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Register a customer (role CLIENTE)")
     public UserResponse register(@Valid @RequestBody RegisterRequest request) {
         User user = auth.register(request.email(), request.password());
         return new UserResponse(user.getId(), user.getEmail(), user.getRole().name());
     }
 
     @PostMapping("/login")
+    @Operation(summary = "Log in and get a 15-minute JWT")
     public TokenResponse login(@Valid @RequestBody LoginRequest request) {
         return new TokenResponse(auth.login(request.email(), request.password()));
     }

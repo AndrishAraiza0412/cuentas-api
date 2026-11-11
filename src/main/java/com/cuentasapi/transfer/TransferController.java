@@ -1,5 +1,10 @@
 package com.cuentasapi.transfer;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import com.cuentasapi.auth.CurrentUser;
 import com.cuentasapi.transfer.TransferService.TransferRequest;
 import com.cuentasapi.transfer.TransferService.TransferResponse;
@@ -15,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@SecurityRequirement(name = "bearerAuth")
 @RequestMapping("/api/v1/transfers")
 public class TransferController {
 
@@ -25,6 +31,9 @@ public class TransferController {
     }
 
     @PostMapping
+    @Operation(summary = "Transfer between accounts; Idempotency-Key makes retries safe",
+            responses = @ApiResponse(responseCode = "201", content = @Content(mediaType = "application/json",
+                    schema = @Schema(implementation = TransferResponse.class))))
     public ResponseEntity<String> create(@RequestHeader("Idempotency-Key") String key,
                                          @RequestBody TransferRequest request) {
         if (key.isBlank() || key.length() > 80 || !key.matches("\\p{Print}+")) {
@@ -35,6 +44,7 @@ public class TransferController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Read a transfer (source owner or OPERADOR)")
     public TransferResponse get(@PathVariable long id) {
         return transfers.get(id, CurrentUser.id(), CurrentUser.isOperator());
     }
