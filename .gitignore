@@ -1,0 +1,6 @@
+.omc/
+.superpowers/
+target/
+.DS_Store
+.idea/
+*.iml

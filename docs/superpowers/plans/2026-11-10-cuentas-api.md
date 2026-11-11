@@ -6,13 +6,13 @@
 
 **Architecture:** One Spring Boot module, packages by feature (`auth`, `audit`, `account`, `transfer`, `common`). Spring Data JPA with PostgreSQL and Flyway; stateless JWT security using Spring Security's own resource server (no extra JWT library). Transfers lock both accounts in ascending id order inside one transaction; idempotency is a row inserted first under a unique constraint.
 
-**Tech Stack:** Java 21, Spring Boot 3.5.16 (Maven), Spring Security + oauth2-resource-server (Nimbus, HS256), Spring Data JPA, Flyway, PostgreSQL 16, springdoc-openapi-starter-webmvc-ui 2.10.0, JUnit 5, Mockito, Testcontainers (via `spring-boot-testcontainers`), Docker, GitHub Actions.
+**Tech Stack:** Java 23, Spring Boot 3.5.16 (Maven), Spring Security + oauth2-resource-server (Nimbus, HS256), Spring Data JPA, Flyway, PostgreSQL 16, springdoc-openapi-starter-webmvc-ui 2.10.0, JUnit 5, Mockito, Testcontainers (via `spring-boot-testcontainers`), Docker, GitHub Actions.
 
 **Spec:** `docs/superpowers/specs/2026-11-10-cuentas-api-design.md`
 
 ## Global Constraints
 
-- Java 21; Spring Boot 3.5.16; Maven; springdoc 2.10.0 (its pom builds on Boot 3.5.16). The machine has no JDK 21: Task 1 installs `openjdk@21` with Homebrew after the user confirms, and builds use `JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`.
+- Java 23 (the user's existing Homebrew `openjdk` 23.0.2, which `mvn` already uses; chosen so local, Docker and CI match; not an LTS release, the README says so); Spring Boot 3.5.16; Maven; springdoc 2.10.0 (its pom builds on Boot 3.5.16). No JDK is installed and no `JAVA_HOME` is set.
 - Base package `com.cuentasapi`; project folder `cuentas_api/`; code, docs and commit messages in English.
 - One currency (MXN). Every amount is a `long` in centavos in the API, the entities and the database; never `double` or `BigDecimal`.
 - Roles `CLIENTE` and `OPERADOR`. Routes under `/api/v1`. Errors are `application/problem+json` (Spring `ProblemDetail`).
@@ -63,8 +63,8 @@ src/test/java/com/cuentasapi/   (mirrors main; IntegrationTest.java is the share
 - Produces: abstract `IntegrationTest` (`@SpringBootTest(webEnvironment = RANDOM_PORT)`, `@Testcontainers`, a static `PostgreSQLContainer<?>` of `postgres:16-alpine` shared by all tests via `@ServiceConnection`, protected `TestRestTemplate rest` and `JdbcTemplate jdbc` autowired, and a `@BeforeEach void clean()` that truncates `audit_log, idempotency_keys, ledger_entries, transfers, accounts, users` with `restart identity cascade`). All later tests extend it.
 - Produces: the V1 schema below, which every later task relies on.
 
-- [ ] **Step 1: Install and verify the JDK.** Ask the user to confirm, then run `brew install openjdk@21`. Verify: `JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home mvn -v` shows `Java version: 21`. Docker Desktop must be running for Testcontainers. Do not change the user's default Java.
-- [ ] **Step 2: Write `pom.xml`:** parent `spring-boot-starter-parent` 3.5.16, `java.version` 21, dependencies `web`, `validation`, `data-jpa`, `security`, `oauth2-resource-server`, `flyway-core` plus `flyway-database-postgresql`, `postgresql` (runtime), `springdoc-openapi-starter-webmvc-ui` 2.10.0; test scope `spring-boot-starter-test`, `spring-security-test`, `spring-boot-testcontainers`, `testcontainers` `junit-jupiter` and `postgresql`. `spring-boot-maven-plugin` builds an executable jar.
+- [ ] **Step 1: Verify the toolchain.** `mvn -v` shows `Java version: 23`. Docker Desktop must be running for Testcontainers (`docker ps` works; add `/Applications/Docker.app/Contents/Resources/bin` to `PATH` if the credential helper is missing). Do not change the user's Java.
+- [ ] **Step 2: Write `pom.xml`:** parent `spring-boot-starter-parent` 3.5.16, `java.version` 23, dependencies `web`, `validation`, `data-jpa`, `security`, `oauth2-resource-server`, `flyway-core` plus `flyway-database-postgresql`, `postgresql` (runtime), `springdoc-openapi-starter-webmvc-ui` 2.10.0; test scope `spring-boot-starter-test`, `spring-security-test`, `spring-boot-testcontainers`, `testcontainers` `junit-jupiter` and `postgresql`. `spring-boot-maven-plugin` builds an executable jar.
 - [ ] **Step 3: Write `application.yml`:** datasource from env with local defaults (`jdbc:postgresql://localhost:5432/cuentas`, user and password `cuentas`), `spring.jpa.hibernate.ddl-auto: validate`, `spring.jpa.open-in-view: false`, `app.jwt.secret` from env `JWT_SECRET` (default a 32+ character dev value, with a startup failure if shorter than 32 bytes), `app.jwt.ttl-minutes: 15`.
 - [ ] **Step 4: Write the failing test `SchemaTest`.** `schema_rejects_negative_balance`: insert a user, then inserting an account with `balance = -1` through `jdbc` throws `DataIntegrityViolationException`. `schema_enforces_unique_idempotency_key_per_user`: two rows with the same (user_id, key) throw the same exception.
 - [ ] **Step 5: Run to verify it fails.** `mvn -q test -Dtest=SchemaTest` fails (no application class or schema).
@@ -201,8 +201,8 @@ src/test/java/com/cuentasapi/   (mirrors main; IntegrationTest.java is the share
 
 **Interfaces:**
 - Consumes: the finished API.
-- Produces: `Dockerfile` multi-stage (`eclipse-temurin:21-jdk` builds with `mvn -q -DskipTests package`, `eclipse-temurin:21-jre` runs the jar as a non-root user); `compose.yaml` with `db` (`postgres:16-alpine`, healthcheck) and `api` (waits for `db` healthy, env `JWT_SECRET`, `OPERATOR_EMAIL`, `OPERATOR_PASSWORD` required with no default, published on `127.0.0.1:8080` only).
-- Produces: CI job on `ubuntu-latest` with `actions/setup-java` (Temurin 21, Maven cache): `mvn -B verify`, then `docker build .`.
+- Produces: `Dockerfile` multi-stage (`eclipse-temurin:23-jdk` builds with `mvn -q -DskipTests package`, `eclipse-temurin:23-jre` runs the jar as a non-root user); `compose.yaml` with `db` (`postgres:16-alpine`, healthcheck) and `api` (waits for `db` healthy, env `JWT_SECRET`, `OPERATOR_EMAIL`, `OPERATOR_PASSWORD` required with no default, published on `127.0.0.1:8080` only).
+- Produces: CI job on `ubuntu-latest` with `actions/setup-java` (Temurin 23, Maven cache): `mvn -B verify`, then `docker build .`.
 
 - [ ] **Step 1: Write the failing test `OpenApiTest`.** `api_docs_list_every_endpoint`: `GET /v3/api-docs` returns 200 and its `paths` contain `/api/v1/transfers`, `/api/v1/accounts/{id}/deposits` and `/api/v1/audit`. Add `@Operation` summaries and `@SecurityScheme` (bearer JWT) so Swagger UI can authorize.
 - [ ] **Step 2: Run to verify it fails, then implement and verify it passes.** `mvn -q test -Dtest=OpenApiTest`.
