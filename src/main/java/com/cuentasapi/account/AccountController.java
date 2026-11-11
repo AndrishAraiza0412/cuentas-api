@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -30,6 +31,9 @@ public class AccountController {
             return new EntryResponse(e.getId(), e.getType().name(), e.getAmount(), e.getBalanceAfter(),
                     e.getTransferId(), e.getCreatedAt());
         }
+    }
+
+    public record DepositRequest(long amount) {
     }
 
     private final AccountService accounts;
@@ -62,5 +66,20 @@ public class AccountController {
                                                @RequestParam(defaultValue = "" + PageSizes.DEFAULT) int size) {
         PageRequest request = PageRequest.of(Math.max(page, 0), PageSizes.cap(size), Sort.by(Sort.Order.desc("id")));
         return PageResponse.of(accounts.entries(id, CurrentUser.id(), CurrentUser.isOperator(), request), EntryResponse::of);
+    }
+
+    @PostMapping("/{id}/deposits")
+    public AccountResponse deposit(@PathVariable long id, @RequestBody DepositRequest request) {
+        return AccountResponse.of(accounts.deposit(id, request.amount(), CurrentUser.id()));
+    }
+
+    @PostMapping("/{id}/freeze")
+    public AccountResponse freeze(@PathVariable long id) {
+        return AccountResponse.of(accounts.setFrozen(id, true, CurrentUser.id()));
+    }
+
+    @PostMapping("/{id}/unfreeze")
+    public AccountResponse unfreeze(@PathVariable long id) {
+        return AccountResponse.of(accounts.setFrozen(id, false, CurrentUser.id()));
     }
 }

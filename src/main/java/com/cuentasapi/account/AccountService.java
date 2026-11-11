@@ -2,6 +2,8 @@ package com.cuentasapi.account;
 
 import com.cuentasapi.audit.AuditService;
 import com.cuentasapi.common.ApiException;
+import com.cuentasapi.common.Money;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -44,5 +46,32 @@ public class AccountService {
     public Page<LedgerEntry> entries(long accountId, long userId, boolean operator, Pageable pageable) {
         get(accountId, userId, operator);
         return entries.findByAccountId(accountId, pageable);
+    }
+
+    @Transactional
+    public Account deposit(long accountId, long amount, long operatorId) {
+        Money.requireValid(amount);
+        Account account = lock(accountId);
+        if (account.isFrozen()) {
+            throw ApiException.conflict("Account is frozen");
+        }
+        account.credit(amount);
+        entries.save(new LedgerEntry(accountId, null, EntryType.CREDIT, amount, account.getBalance()));
+        audit.record(operatorId, "DEPOSIT", "account:" + accountId, "OK");
+        return account;
+    }
+
+    /** Idempotent: freezing a frozen account (or unfreezing an active one) changes nothing but is still audited. */
+    @Transactional
+    public Account setFrozen(long accountId, boolean frozen, long operatorId) {
+        Account account = lock(accountId);
+        account.setStatus(frozen ? AccountStatus.FROZEN : AccountStatus.ACTIVE);
+        audit.record(operatorId, frozen ? "FREEZE" : "UNFREEZE", "account:" + accountId, "OK");
+        return account;
+    }
+
+    private Account lock(long accountId) {
+        return accounts.lockAllById(List.of(accountId)).stream().findFirst()
+                .orElseThrow(() -> ApiException.notFound("Account not found"));
     }
 }
