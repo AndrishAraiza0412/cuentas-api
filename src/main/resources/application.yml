@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/cuentas}
+    username: ${DATABASE_USER:cuentas}
+    password: ${DATABASE_PASSWORD:cuentas}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+app:
+  jwt:
+    # HS256 key: at least 32 bytes. Override with JWT_SECRET outside local development.
+    secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+    ttl-minutes: 15
