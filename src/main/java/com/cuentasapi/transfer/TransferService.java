@@ -8,14 +8,25 @@ import com.cuentasapi.account.LedgerEntryRepository;
 import com.cuentasapi.audit.AuditService;
 import com.cuentasapi.common.ApiException;
 import com.cuentasapi.common.Money;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.List;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class TransferService {
+
+    /** What the client receives: the stored status and JSON body, identical on every replay. */
+    public record StoredResponse(int status, String body) {
+    }
 
     public record TransferRequest(long sourceAccountId, long targetAccountId, long amount) {
     }
@@ -32,27 +43,70 @@ public class TransferService {
     private final LedgerEntryRepository entries;
     private final TransferRepository transfers;
     private final AuditService audit;
+    private final IdempotencyRepository idempotency;
+    private final ObjectMapper json;
     private final TransactionTemplate tx;
 
     public TransferService(AccountRepository accounts, LedgerEntryRepository entries, TransferRepository transfers,
-                           AuditService audit, PlatformTransactionManager transactionManager) {
+                           AuditService audit, IdempotencyRepository idempotency, ObjectMapper json,
+                           PlatformTransactionManager transactionManager) {
         this.accounts = accounts;
         this.entries = entries;
         this.transfers = transfers;
         this.audit = audit;
+        this.idempotency = idempotency;
+        this.json = json;
         this.tx = new TransactionTemplate(transactionManager);
     }
 
     /**
-     * Runs the transfer in one transaction. A failure rolls everything back and is audited afterwards, outside the
-     * transaction: auditing inside it would need a second database connection per request.
+     * Runs the transfer in one transaction, keyed by (user, Idempotency-Key). The key row is inserted first: a
+     * concurrent request with the same key waits on the unique index, then fails and replays the stored response.
+     * A failed transfer rolls back its key row too, so the same key can be retried once the cause is fixed. Failures
+     * are audited afterwards, outside the transaction: auditing inside it would need a second connection per request.
      */
-    public TransferResponse transfer(long userId, TransferRequest request) {
+    public StoredResponse transfer(long userId, String key, TransferRequest request) {
+        String hash = hash(request);
         try {
-            return tx.execute(status -> execute(userId, request));
+            return tx.execute(status -> {
+                IdempotencyKey row = idempotency.saveAndFlush(new IdempotencyKey(userId, key, hash));
+                String body = toJson(execute(userId, request));
+                row.complete(201, body);
+                return new StoredResponse(201, body);
+            });
+        } catch (DataIntegrityViolationException possibleDuplicate) {
+            return replay(userId, key, hash, possibleDuplicate);
         } catch (ApiException e) {
             audit.recordIndependent(userId, "TRANSFER", target(request), "FAILED: " + e.getMessage());
             throw e;
+        }
+    }
+
+    private StoredResponse replay(long userId, String key, String hash, DataIntegrityViolationException original) {
+        IdempotencyKey stored = idempotency.findByUserIdAndRequestKey(userId, key).orElseThrow(() -> original);
+        if (!stored.getRequestHash().equals(hash)) {
+            throw ApiException.unprocessable("Idempotency-Key was already used with a different request");
+        }
+        if (stored.getResponseBody() == null) {
+            throw original;
+        }
+        return new StoredResponse(stored.getResponseStatus(), stored.getResponseBody());
+    }
+
+    private String toJson(TransferResponse response) {
+        try {
+            return json.writeValueAsString(response);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static String hash(TransferRequest request) {
+        String canonical = request.sourceAccountId() + ":" + request.targetAccountId() + ":" + request.amount();
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonical.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
         }
     }
 

@@ -3,13 +3,15 @@ package com.cuentasapi.transfer;
 import com.cuentasapi.auth.CurrentUser;
 import com.cuentasapi.transfer.TransferService.TransferRequest;
 import com.cuentasapi.transfer.TransferService.TransferResponse;
-import org.springframework.http.HttpStatus;
+import com.cuentasapi.common.ApiException;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -23,9 +25,13 @@ public class TransferController {
     }
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public TransferResponse create(@RequestBody TransferRequest request) {
-        return transfers.transfer(CurrentUser.id(), request);
+    public ResponseEntity<String> create(@RequestHeader("Idempotency-Key") String key,
+                                         @RequestBody TransferRequest request) {
+        if (key.isBlank() || key.length() > 80 || !key.matches("\\p{Print}+")) {
+            throw ApiException.badRequest("Idempotency-Key must be 1 to 80 printable characters");
+        }
+        TransferService.StoredResponse stored = transfers.transfer(CurrentUser.id(), key, request);
+        return ResponseEntity.status(stored.status()).contentType(MediaType.APPLICATION_JSON).body(stored.body());
     }
 
     @GetMapping("/{id}")
