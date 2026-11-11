@@ -49,7 +49,13 @@ public abstract class IntegrationTest {
 
     /** Calls the API with an optional bearer token and optional JSON body. */
     protected <T> ResponseEntity<T> call(HttpMethod method, String path, String token, Object body, Class<T> type) {
+        return call(method, path, token, body, type, Map.of());
+    }
+
+    protected <T> ResponseEntity<T> call(HttpMethod method, String path, String token, Object body, Class<T> type,
+                                         Map<String, String> extraHeaders) {
         HttpHeaders headers = new HttpHeaders();
+        extraHeaders.forEach(headers::set);
         if (token != null) {
             headers.setBearerAuth(token);
         }
