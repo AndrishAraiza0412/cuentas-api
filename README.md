@@ -66,7 +66,7 @@ mvn verify                    # 58 tests; needs Docker running for Testcontainer
 - The operator is created from `OPERATOR_EMAIL` and `OPERATOR_PASSWORD`; changing the password means changing the user in the database.
 - Deposits are not idempotent: an operator who retries a deposit credits it twice.
 - A transfer that fails is not stored for idempotency: repeating it re-evaluates it. Only successful transfers replay.
-- Local only. It has not been deployed, and the GitHub Actions workflow ([`ci.yml`](.github/workflows/ci.yml)) has not run yet, so CI is unverified until the first push.
+- It has not been deployed. The GitHub Actions workflow ([`ci.yml`](.github/workflows/ci.yml)) ran `mvn verify` (with Testcontainers on the runner) and the Docker build green on its first run, on the first pull request.
 
 ## AI usage
 
