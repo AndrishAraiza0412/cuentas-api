@@ -1,0 +1,97 @@
+# Example calls for the VS Code "REST Client" extension (or any .http runner that supports named requests).
+# Start the stack first: see the README. The operator is the one set in .env (OPERATOR_EMAIL / OPERATOR_PASSWORD).
+
+@host = http://localhost:8080/api/v1
+
+### 1. Register two customers
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{"email": "ana@example.com", "password": "correct-horse-1"}
+
+###
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{"email": "ben@example.com", "password": "correct-horse-1"}
+
+### 2. Log in (each login names its response so later calls can reuse the token)
+# @name loginAna
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{"email": "ana@example.com", "password": "correct-horse-1"}
+
+###
+# @name loginBen
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{"email": "ben@example.com", "password": "correct-horse-1"}
+
+###
+# @name loginOperator
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{"email": "operator@bank.test", "password": "change-me-operator-password"}
+
+###
+@ana = {{loginAna.response.body.token}}
+@ben = {{loginBen.response.body.token}}
+@operator = {{loginOperator.response.body.token}}
+
+### 3. Each customer opens an account (ids are 1 and 2 on a fresh database)
+POST {{host}}/accounts
+Authorization: Bearer {{ana}}
+
+###
+POST {{host}}/accounts
+Authorization: Bearer {{ben}}
+
+### 4. The operator funds ana's account: 50,000 centavos = 500.00 MXN
+POST {{host}}/accounts/1/deposits
+Authorization: Bearer {{operator}}
+Content-Type: application/json
+
+{"amount": 50000}
+
+### 5. Ana transfers 12,345 centavos to ben. The Idempotency-Key makes retries safe.
+POST {{host}}/transfers
+Authorization: Bearer {{ana}}
+Idempotency-Key: demo-1
+Content-Type: application/json
+
+{"sourceAccountId": 1, "targetAccountId": 2, "amount": 12345}
+
+### 6. Send the exact same request again: same response, and the money moves only once
+POST {{host}}/transfers
+Authorization: Bearer {{ana}}
+Idempotency-Key: demo-1
+Content-Type: application/json
+
+{"sourceAccountId": 1, "targetAccountId": 2, "amount": 12345}
+
+### 7. Same key, different amount: 422
+POST {{host}}/transfers
+Authorization: Bearer {{ana}}
+Idempotency-Key: demo-1
+Content-Type: application/json
+
+{"sourceAccountId": 1, "targetAccountId": 2, "amount": 99999}
+
+### 8. History of ana's account, newest first
+GET {{host}}/accounts/1/entries
+Authorization: Bearer {{ana}}
+
+### 9. Ben cannot see ana's account: 404, not 403
+GET {{host}}/accounts/1
+Authorization: Bearer {{ben}}
+
+### 10. The operator freezes ana's account; a new transfer from it is a 409
+POST {{host}}/accounts/1/freeze
+Authorization: Bearer {{operator}}
+
+### 11. The operator reads the audit log, filtered by action
+GET {{host}}/audit?action=TRANSFER
+Authorization: Bearer {{operator}}

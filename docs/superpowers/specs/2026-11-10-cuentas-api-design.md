@@ -13,7 +13,7 @@ Project B of `camino_a_seguir_cv.txt`. A bank-style REST API in Java, built to s
 
 - Local work only: no deployment, no video, no push to GitHub without asking (see the project memory).
 - One currency (MXN). Amounts are integers in centavos.
-- Java 21, Spring Boot 3, Maven. The machine has JDK 17, 18 and 20 and no JDK 21; installing `openjdk@21` with Homebrew is a step to confirm with the user, without changing the current Java.
+- Java 23 (the Homebrew `openjdk` already installed, which Maven uses; the user chose it over installing 21 so local, Docker and CI all match), Spring Boot 3.5.x, Maven. Java 23 is not an LTS release; the README says so.
 - Docs and code in English; the Spanish-speaking user decides in Spanish.
 
 ## Out of scope

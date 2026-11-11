@@ -1,0 +1,28 @@
+spring:
+  jackson:
+    mapper:
+      # A JSON string such as "100" is not an amount: reject it instead of coercing it.
+      allow-coercion-of-scalars: false
+    deserialization:
+      # Amounts are whole centavos: 1.5 must be a 400, not silently truncated to 1.
+      accept-float-as-int: false
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/cuentas}
+    username: ${DATABASE_USER:cuentas}
+    password: ${DATABASE_PASSWORD:cuentas}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+app:
+  jwt:
+    # HS256 key: at least 32 bytes. Override with JWT_SECRET outside local development.
+    secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+    ttl-minutes: 15
